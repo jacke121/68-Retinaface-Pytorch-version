@@ -42,7 +42,7 @@ def get_args():
 
     return args
 
-def main(nummmmmm):
+def main():
     args = get_args()
 
     # Create the model
@@ -62,46 +62,44 @@ def main(nummmmmm):
     # Create torchvision model
     
     return_layers = {'layer2':1,'layer3':2,'layer4':3}
-    RetinaFace = torchvision_model.create_retinaface(return_layers)
+    model = torchvision_model.create_retinaface(return_layers)
     device= torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     # Load trained model
-    retina_dict = RetinaFace.state_dict()
-    pre_state_dict = torch.load('stage_5_68_full_model_epoch_121.pt',map_location='cpu')
+    retina_dict = model.state_dict()
+    pre_state_dict = torch.load('out/stage_5_68_full_model_epoch_121.pt',map_location='cpu')
     pretrained_dict = {k[7:]: v for k, v in pre_state_dict.items() if k[7:] in retina_dict}
-    RetinaFace.load_state_dict(pretrained_dict)
-    RetinaFace.to(device)
-    
+    model.load_state_dict(pretrained_dict)
+    # model.to(device)
+    model.eval()
+    model.cuda()
     import time
     
     video = cv2.VideoCapture(0)
     # Read image
     while True:
-        start=time.time()
-        ret, img = video.read()
-        img=cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+        ret, img_raw = video.read()
+
+        img_raw = cv2.resize(img_raw, (480, 360))
+
+        start = time.time()
+        img=cv2.cvtColor(img_raw, cv2.COLOR_BGR2RGB)
         img = torch.from_numpy(img)
         img = img.permute(2,0,1)
-        resized_img=img.float()
-        # resized_img = resize(img.float(),(360,640))
-        # print(resized_img.shape)
-        input_img = resized_img.float().unsqueeze(0)
+        input_img = img.float().unsqueeze(0)
         
-        picked_boxes, picked_landmarks = eval_widerface.get_detections(input_img, RetinaFace, score_threshold=0.5, iou_threshold=0.3)
-        # print(picked_boxes)
-        np_img = resized_img.cpu().permute(1,2,0).numpy()
-        np_img.astype(int)
-        img = cv2.cvtColor(np_img.astype(np.uint8),cv2.COLOR_BGR2RGB)
+        picked_boxes, picked_landmarks = eval_widerface.get_detections(input_img, model, score_threshold=0.9, iou_threshold=0.2)
 
         for j, boxes in enumerate(picked_boxes):
             if boxes is not None:
                 for box,landmark in zip(boxes,picked_landmarks[j]):
-                    cv2.rectangle(img,(box[0],box[1]),(box[2],box[3]),(0,0,255),thickness=2)
+                    cv2.rectangle(img_raw,(box[0],box[1]),(box[2],box[3]),(0,0,255),thickness=2)
                     for i in range(0,136,2):
-                        cv2.circle(img,(landmark[i],landmark[i+1]),radius=1,color=(0,0,255),thickness=2)
-        cv2.imshow('RetinaFace-Pytorch',img)
+                        cv2.circle(img_raw,(landmark[i],landmark[i+1]),radius=1,color=(0,0,255),thickness=2)
+        cv2.imshow('RetinaFace-Pytorch',img_raw)
         print(time.time()-start)
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 if __name__=='__main__':
-    main(20)
+    main()

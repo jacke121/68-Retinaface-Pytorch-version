@@ -55,6 +55,9 @@ def main():
     RetinaFace = RetinaFace.cuda()
     RetinaFace.eval()
 
+    vc=cv2.VideoCapture(0)
+    while True:  # 循环读取视频帧
+        rval, img_raw = vc.read()
     # Read image
     img = skimage.io.imread(args.image_path)
     img = torch.from_numpy(img)
@@ -84,8 +87,8 @@ def main():
                 cv2.circle(img,(landmark[8],landmark[9]),radius=1,color=(255,255,0),thickness=2)
 
     image_name = args.image_path.split('/')[-1]
-    save_path = os.path.join(args.save_path,image_name)
-    cv2.imwrite(save_path, img)
+    # save_path = os.path.join(args.save_path,image_name)
+    # cv2.imwrite(save_path, img)
     cv2.imshow('RetinaFace-Pytorch',img)
     cv2.waitKey()
 

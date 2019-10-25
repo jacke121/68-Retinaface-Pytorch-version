@@ -16,7 +16,6 @@ def get_detections(img_batch, model, score_threshold=0.5, iou_threshold=0.5):
     with torch.no_grad():
         # [1,16800,2]
         classifications, bboxes, landmarks = model(img_batch)
-        print('net time',time.time() - start)
         batch_size = classifications.shape[0]
         picked_boxes = []
         picked_landmarks = []
@@ -24,43 +23,52 @@ def get_detections(img_batch, model, score_threshold=0.5, iou_threshold=0.5):
         for i in range(batch_size):
             # [16800,2]
             classification = torch.exp(classifications[i, :, :])
-            bbox = bboxes[i, :, :]
+            boxes = bboxes[i, :, :]
+            boxes = boxes.cpu().numpy()
             landmark = landmarks[i, :, :]
-
+            landmark = landmark.cpu().numpy()
             # choose positive and scores > score_threshold
-            scores, argmax = torch.max(classification, dim=1)
-            argmax_indice = argmax == 0
+            # scores, argmax = torch.max(classification, dim=1)
 
+            scores = classification.data.cpu().numpy()[:, 1]
 
+            inds = np.where(scores > score_threshold)[0]
+            boxes = boxes[inds]
+            # landms = landms[inds]
+            scores = scores[inds]
+            landmark = landmark[inds]
+            # keep top-K before NMS
+            order = scores.argsort()[::-1][:20]
+            boxes = boxes[order]
+            # landms = landms[order]
+            scores = scores[order]
 
-            scores_indice = (scores > score_threshold)
-            positive_indices = argmax_indice & scores_indice
+            # argmax_indice = argmax==0
+            # scores_indice = (scores > score_threshold)
 
-            # positive_indices=torch.topk(positive_indices, 20, dim=None, largest=True, sorted=True, out=None)
+            # scores = scores[scores_indice]
 
-            scores = scores[positive_indices]
-            print(scores.shape)
+            # keep top-K before NMS
+            # positive_indices = scores.argsort()[::-1][:20]
+            #
+            # inds = np.where(scores > score_threshold)[0]
+            # # positive_indices = argmax_indice & scores_indice
+            #
+            # scores = scores[positive_indices]
+
             if scores.shape[0] == 0:
                 picked_boxes.append(None)
                 picked_landmarks.append(None)
                 continue
 
-            bbox = bbox[positive_indices]
-            landmark = landmark[positive_indices]
-
-            value, scores_indice = torch.topk(scores,scores.shape[0]//3, dim=0, largest=True, sorted=True, out=None)
-
-            scores = scores[scores_indice]
-            bbox = bbox[scores_indice]
-            landmark = landmark[scores_indice]
-            print('2',scores.shape)
-
+            # bbox = bbox[positive_indices]
+            landmark = landmark[order]
             keep = ops.boxes.nms(bbox, scores, iou_threshold)
             keep_boxes = bbox[keep]
             keep_landmarks = landmark[keep]
             picked_boxes.append(keep_boxes)
             picked_landmarks.append(keep_landmarks)
-
+        # print(time.time()-start)
         return picked_boxes, picked_landmarks
 
 
